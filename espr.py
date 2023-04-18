@@ -6,7 +6,6 @@ import time
 import datetime
 import json
 import requests
-import random
 
 CONFIG = {
     "id": "region-x-area",
@@ -46,7 +45,7 @@ def getData(token):
 
                 if raw != "":
                     cache = json.loads(raw)
-                    if cache["timestamp"] + (CONFIG["refresh"] * 60) < time.time():
+                    if cache["timestamp"] + (CONFIG["refresh"] * 60) > time.time():
                         return cache
 
             except:
@@ -60,7 +59,7 @@ def getData(token):
         )
 
         if resp.status_code != 200:
-            print("ERR: Failed to get latest data.")
+            print("ERR: Failed to get latest data. Code ", resp.status_code)
             exit()
 
         with open(cache_file, "w") as f:
@@ -85,7 +84,7 @@ def apiTimeToUnixTime(apiTime: str):
     return int(datetime.datetime.strptime(apiTime, "%Y-%m-%dT%H:%M:%S%z").timestamp())
 
 def unixTimeToNeatTime(unixTime: float):
-    return datetime.datetime.utcfromtimestamp(unixTime).time().isoformat()[:-3]
+    return datetime.datetime.fromtimestamp(unixTime).strftime("%H:%M")
 
 # Get a (currentEvent, nextEvent) tuple
 #   nextEvent is the next period for which there will be loadshedding
