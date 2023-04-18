@@ -1,0 +1,7 @@
+[module/esp]
+type = custom/script
+
+exec = python3 ~/.config/polybar/scripts/esp/esp.py
+tail = true
+
+click-left = python3 ~/.config/polybar/scripts/esp/esp.py -u
