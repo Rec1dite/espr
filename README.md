@@ -59,3 +59,4 @@ exec = /path/to/your/polybar/scripts/espr/espr.py "<when> (<areaRegion>)"
 ```
 
 ## Screenshots
+![shot1](https://raw.githubusercontent.com/Rec1dite/espr/master/screenshots/shot1.png)
