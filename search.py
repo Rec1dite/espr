@@ -4,12 +4,14 @@ import json
 import requests
 
 def getToken():
-    if not os.path.exists("token"):
+    token_file = os.path.dirname(os.path.realpath(__file__)) + os.sep + "token"
+
+    if not os.path.exists(token_file):
         print("ERR: No token file found.")
         print("Please create a file called 'token' within the same directory as this script and paste your ESP API token in it.")
         exit()
 
-    with open("token", "r") as f:
+    with open(token_file, "r") as f:
         token = f.read()
         if token == "":
             print("ERR: Token file is empty.")
