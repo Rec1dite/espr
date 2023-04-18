@@ -1,7 +1,0 @@
-[module/esp]
-type = custom/script
-
-exec = python3 ~/.config/polybar/scripts/esp/esp.py "<areaName> <next> <when>"
-tail = true
-
-click-left = python3 ~/.config/polybar/scripts/esp/esp.py -u
