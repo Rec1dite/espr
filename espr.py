@@ -9,33 +9,7 @@ import time
 import datetime
 import json
 import requests
-
-CONFIG = {
-    "id": "region-x-area",
-    "name": "YOURAREA (x)",
-    "region": "YourRegion",
-    "refresh": 30, # How often to refresh the data in minutes
-}
-
-# Get the ESP API token from the token file
-def getToken() -> (str | None):
-    token_file = os.path.dirname(os.path.realpath(__file__)) + os.sep + "token"
-
-    if not os.path.exists(token_file):
-        print("ERR: No token file found.")
-        print(
-            "Please create a file called 'token' within the same directory" +
-            "as this script and paste your ESP API token in it."
-        )
-        sys.exit()
-
-    with open(token_file, "r", encoding="utf-8") as f:
-        tok = f.read()
-        if tok == "":
-            print("ERR: Token file is empty.")
-            sys.exit()
-
-        return tok if tok != "" else None
+from configs import CONFIG, getToken
 
 
 # Cache + Return the latest loadshedding data for the area
@@ -78,7 +52,7 @@ def getData(tok):
 
             return dat
 
-    except ValueError as e:
+    except Exception as e: # pylint: disable=W0718
         if cache is None:
             # print("ERR: Unable to get data from cache or API")
             print(e)
@@ -93,6 +67,11 @@ def apiTimeToUnixTime(apiTime: str):
 
 def unixTimeToNeatTime(unixTime: float):
     return datetime.datetime.fromtimestamp(unixTime).strftime("%H:%M")
+
+def unixDeltaToSIUnits(unixTime: float):
+    hours = round(unixTime/3600)
+    mins = round((unixTime/60)%60)
+    return f"{hours}h" + ("" if mins == 0 else f" {mins}m")
 
 # Get a (currentEvent, nextEvent) tuple
 #   nextEvent is the next period for which there will be loadshedding
@@ -150,6 +129,16 @@ def formatOutput(inp: str, dat: dict):
             inp = inp.replace(tag, unixTimeToNeatTime(nextEvent["start"]))
         else:
             inp = inp.replace(tag, "NODATA")
+
+    # Show the duration of the current/next stage
+    if (tag := "<whenDur>") in inp:
+        if nextEvent is not None:
+            if currEvent is None:
+                inp = inp.replace(tag, unixDeltaToSIUnits(nextEvent["end"] - nextEvent["start"]))
+            else:
+                inp = inp.replace(tag, unixDeltaToSIUnits(currEvent["end"] - currEvent["start"]))
+        else:
+            inp.replace(tag, "NODATA")
 
     return inp
 
