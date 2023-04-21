@@ -1,4 +1,7 @@
 #!/bin/python3
+# pylint: disable=C0103,C0116
+
+"""A simple polybar module to remind you when loadshedding is scheduled."""
 
 import os
 import sys
@@ -14,32 +17,36 @@ CONFIG = {
     "refresh": 30, # How often to refresh the data in minutes
 }
 
-def getToken():
+# Get the ESP API token from the token file
+def getToken() -> (str | None):
     token_file = os.path.dirname(os.path.realpath(__file__)) + os.sep + "token"
 
     if not os.path.exists(token_file):
         print("ERR: No token file found.")
-        print("Please create a file called 'token' within the same directory as this script and paste your ESP API token in it.")
-        exit()
+        print(
+            "Please create a file called 'token' within the same directory" +
+            "as this script and paste your ESP API token in it."
+        )
+        sys.exit()
 
-    with open(token_file, "r") as f:
-        token = f.read()
-        if token == "":
+    with open(token_file, "r", encoding="utf-8") as f:
+        tok = f.read()
+        if tok == "":
             print("ERR: Token file is empty.")
-            exit()
+            sys.exit()
 
-        return token if token != "" else None
+        return tok if tok != "" else None
 
 
 # Cache + Return the latest loadshedding data for the area
 # Data cache is refreshed every CONFIG["refresh"] minutes
-def getData(token):
+def getData(tok):
     cache_file = os.path.dirname(os.path.realpath(__file__)) + os.sep + "cache.json"
     cache = None
 
     # Check if we have a cached version of the data
     if os.path.exists(cache_file):
-        with open(cache_file, "r") as f:
+        with open(cache_file, "r", encoding="utf-8") as f:
             try:
                 raw = f.read()
 
@@ -48,33 +55,34 @@ def getData(token):
                     if cache["timestamp"] + (CONFIG["refresh"] * 60) > time.time():
                         return cache
 
-            except:
+            except ValueError:
                 pass # Ignore errors, we'll just try get the data again
 
     # Get the latest data
     try:
         resp = requests.get(
-            "https://developer.sepush.co.za/business/2.0/area?id={}".format(CONFIG["id"]),
-            headers={"Token": token}
+            f"https://developer.sepush.co.za/business/2.0/area?id={CONFIG['id']}",
+            headers={"Token": tok},
+            timeout=10
         )
 
         if resp.status_code != 200:
             print("ERR: Failed to get latest data. Code ", resp.status_code)
-            exit()
+            sys.exit()
 
-        with open(cache_file, "w") as f:
-            data = resp.json()
-            data["timestamp"] = time.time()
+        with open(cache_file, "w", encoding="utf-8") as f:
+            dat = resp.json()
+            dat["timestamp"] = time.time()
 
-            f.write(json.dumps(data, indent=4))
+            f.write(json.dumps(dat, indent=4))
 
-            return data
+            return dat
 
-    except Exception as e:
-        if cache == None:
+    except ValueError as e:
+        if cache is None:
             # print("ERR: Unable to get data from cache or API")
             print(e)
-            exit()
+            sys.exit()
 
         return cache
 
@@ -90,11 +98,11 @@ def unixTimeToNeatTime(unixTime: float):
 #   nextEvent is the next period for which there will be loadshedding
 #   If we are currently loadshedding, currentEvent is the period it will last
 #   If we aren't currently loadshedding, currentEvent is None
-def getImmediateLoadsheddingEvents(data: dict, now: float):
+def getImmediateLoadsheddingEvents(dat: dict, now: float):
     (currentEvent, nextEvent) = (None, None)
 
     # Events are sorted chronologically
-    for event in data["events"]:
+    for event in dat["events"]:
 
         start = apiTimeToUnixTime(event["start"])
         end = apiTimeToUnixTime(event["end"])
@@ -106,18 +114,18 @@ def getImmediateLoadsheddingEvents(data: dict, now: float):
             "stage": stage
         }
 
-        if now < end and now >= start:
+        if start <= now < end:
             # print(neatEvent)
             currentEvent = neatEvent
 
-        if nextEvent == None and now < start:
+        if nextEvent is None and now < start:
             nextEvent = neatEvent
-    
+
     return (currentEvent, nextEvent)
 
 # Replace tags in the input string with the appropriate content
-def formatOutput(inp: str, data: dict):
-    (currEvent, nextEvent) = getImmediateLoadsheddingEvents(data, time.time())
+def formatOutput(inp: str, dat: dict):
+    (currEvent, nextEvent) = getImmediateLoadsheddingEvents(dat, time.time())
 
     if (tag := "<areaName>") in inp:
         inp = inp.replace("<areaName>", CONFIG["name"])
@@ -128,8 +136,8 @@ def formatOutput(inp: str, data: dict):
     # If currently loadshedding show when it ends
     # Else show the next expected stage
     if (tag := "<when>") in inp:
-        if nextEvent != None:
-            if currEvent == None:
+        if nextEvent is not None:
+            if currEvent is None:
                 inp = inp.replace(tag, "NEXT: " + unixTimeToNeatTime(nextEvent["start"]))
             else:
                 inp = inp.replace(tag, "TILL: " + unixTimeToNeatTime(currEvent["end"]))
@@ -138,11 +146,11 @@ def formatOutput(inp: str, data: dict):
 
     # Always show the next stage
     if (tag := "<next>") in inp:
-        if nextEvent != None:
+        if nextEvent is not None:
             inp = inp.replace(tag, unixTimeToNeatTime(nextEvent["start"]))
         else:
             inp = inp.replace(tag, "NODATA")
-    
+
     return inp
 
 
